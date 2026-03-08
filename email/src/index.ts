@@ -24,10 +24,12 @@ async function run() {
   // ── Subscribe to both topics ──────────────────────────────────────────────
 
   await consumer.subscribe({
-    topics: ['email-topic', 'user-created'],
+    topics: ['email-topic', 'user-created', 'product-out-of-stock'],
     fromBeginning: false,
   });
-  logger.info('Kafka consumer subscribed to email-topic, user-created');
+  logger.info(
+    'Kafka consumer subscribed to email-topic, user-created ,product-out-of-stock',
+  );
 
   await consumer.run({
     eachMessage: async ({ topic, message }: EachMessagePayload) => {
