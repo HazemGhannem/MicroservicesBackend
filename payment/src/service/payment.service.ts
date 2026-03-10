@@ -28,7 +28,7 @@ export const initiatePayment = async (
     userId,
     userEmail,
     provider: data.paymentMethod,
-    amount: 0, // amount is set via Kafka flow
+    amount: data.amount, // amount is set via Kafka flow
     status: 'pending',
   });
 

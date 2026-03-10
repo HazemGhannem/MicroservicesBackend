@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const initiatePaymentSchema = z.object({
   orderId: z.string().min(1),
   paymentMethod: z.enum(['stripe', 'paypal']),
+  amount: z.coerce.number().positive(),
 });
 
 export const capturePayPalSchema = z.object({

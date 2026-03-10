@@ -11,6 +11,31 @@ import {
   sendPaymentRequested,
 } from '../kafka/order.producer';
 
+// ── Request Payment ──────────────────────────────────────────────────────────────
+const requestPayment = async (data: {
+  orderId: string;
+  userId: string;
+  userEmail: string;
+  amount: number;
+  paymentMethod: string;
+  token: string;
+}) => {
+  const res = await fetch('http://payment-service:5004/api/payments/initiate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${data.token}`,
+    },
+    body: JSON.stringify({
+      orderId: data.orderId,
+      paymentMethod: data.paymentMethod,
+      amount: data.amount,
+    }),
+  });
+
+  if (!res.ok) throw new AppError('Payment service failed', 502);
+  return res.json();
+};
 // ── Create order ──────────────────────────────────────────────────────────────
 export const createOrder = async (
   data: CreateOrderInput,

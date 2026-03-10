@@ -109,5 +109,24 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  payment-service:
+    build:
+      context: ./payment
+      dockerfile: Dockerfile
+    ports:
+      - '5004:5004'
+    env_file:
+      - ./payment/.env
+    volumes:
+      - ./payment/src:/app/src
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      order-service:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   mongo-data:

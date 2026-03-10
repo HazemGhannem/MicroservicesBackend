@@ -1,5 +1,13 @@
+import { logger } from '../utils/logger';
 import { producer } from './config';
- 
+const safeSend = (fn: () => Promise<unknown>): void => {
+  Promise.race([
+    fn(),
+    new Promise<unknown>((_, reject) =>
+      setTimeout(() => reject(new Error('Kafka timeout')), 3000),
+    ),
+  ]).catch((err) => logger.error({ err }, 'Kafka send failed'));
+};
 // ── Payment success → order service updates order ─────────────────────────────
 export const sendPaymentSuccess = (data: {
   orderId: string;
@@ -9,23 +17,26 @@ export const sendPaymentSuccess = (data: {
   amount: number;
   paymentMethod: string;
 }): void => {
-  producer.send({
-    topic: 'payment-success',
-    messages: [{ value: JSON.stringify(data) }],
-  });
-
-  producer.send({
-    topic: 'email-topic',
-    messages: [
-      {
-        value: JSON.stringify({
-          to: data.userEmail,
-          subject: '✅ Payment Successful',
-          body: `Your payment of $${data.amount} for order #${data.orderId} was successful.`,
-        }),
-      },
-    ],
-  });
+  safeSend(() =>
+    producer.send({
+      topic: 'payment-success',
+      messages: [{ value: JSON.stringify(data) }],
+    }),
+  );
+  safeSend(() =>
+    producer.send({
+      topic: 'email-topic',
+      messages: [
+        {
+          value: JSON.stringify({
+            to: data.userEmail,
+            subject: '✅ Payment Successful',
+            body: `Payment of $${data.amount} for order #${data.orderId} was successful.`,
+          }),
+        },
+      ],
+    }),
+  );
 };
 
 // ── Payment failed ────────────────────────────────────────────────────────────
@@ -34,23 +45,26 @@ export const sendPaymentFailed = (data: {
   userId: string;
   userEmail: string;
 }): void => {
-  producer.send({
-    topic: 'payment-failed',
-    messages: [{ value: JSON.stringify(data) }],
-  });
-
-  producer.send({
-    topic: 'email-topic',
-    messages: [
-      {
-        value: JSON.stringify({
-          to: data.userEmail,
-          subject: '❌ Payment Failed',
-          body: `Your payment for order #${data.orderId} failed. Please try again.`,
-        }),
-      },
-    ],
-  });
+  safeSend(() =>
+    producer.send({
+      topic: 'payment-failed',
+      messages: [{ value: JSON.stringify(data) }],
+    }),
+  );
+  safeSend(() =>
+    producer.send({
+      topic: 'email-topic',
+      messages: [
+        {
+          value: JSON.stringify({
+            to: data.userEmail,
+            subject: '❌ Payment Failed',
+            body: `Payment for order #${data.orderId} failed.`,
+          }),
+        },
+      ],
+    }),
+  );
 };
 
 // ── Refund processed ──────────────────────────────────────────────────────────
@@ -60,21 +74,24 @@ export const sendRefundProcessed = (data: {
   userEmail: string;
   amount: number;
 }): void => {
-  producer.send({
-    topic: 'refund-processed',
-    messages: [{ value: JSON.stringify(data) }],
-  });
-
-  producer.send({
-    topic: 'email-topic',
-    messages: [
-      {
-        value: JSON.stringify({
-          to: data.userEmail,
-          subject: '💰 Refund Processed',
-          body: `Your refund of $${data.amount} for order #${data.orderId} has been processed.`,
-        }),
-      },
-    ],
-  });
+  safeSend(() =>
+    producer.send({
+      topic: 'refund-processed',
+      messages: [{ value: JSON.stringify(data) }],
+    }),
+  );
+  safeSend(() =>
+    producer.send({
+      topic: 'email-topic',
+      messages: [
+        {
+          value: JSON.stringify({
+            to: data.userEmail,
+            subject: '💰 Refund Processed',
+            body: `Refund of $${data.amount} for order #${data.orderId} processed.`,
+          }),
+        },
+      ],
+    }),
+  );
 };
