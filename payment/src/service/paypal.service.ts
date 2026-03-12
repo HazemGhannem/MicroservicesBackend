@@ -1,39 +1,39 @@
-import { PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_MODE } from '../db/env';
+import {
+  PAYPAL_API,
+  PAYPAL_CLIENT_ID,
+  PAYPAL_CLIENT_SECRET,
+  PAYPAL_MODE,
+  PAYPAL_SANDBOX_API,
+} from '../db/env';
+import axios from 'axios';
 
-const PAYPAL_BASE =
-  PAYPAL_MODE === 'live'
-    ? 'https://api-m.paypal.com'
-    : 'https://api-m.sandbox.paypal.com';
+const PAYPAL_BASE = PAYPAL_MODE === 'live' ? PAYPAL_API : PAYPAL_SANDBOX_API;
 
 const getAccessToken = async (): Promise<string> => {
-  const credentials = Buffer.from(
-    `${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`,
-  ).toString('base64');
-
-  const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${credentials}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
+  const { data } = await axios.post(
+    `${PAYPAL_BASE}/v1/oauth2/token`,
+    'grant_type=client_credentials',
+    {
+      auth: {
+        username: PAYPAL_CLIENT_ID,
+        password: PAYPAL_CLIENT_SECRET,
+      },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
     },
-    body: 'grant_type=client_credentials',
-  });
+  );
 
-  const data = (await res.json()) as { access_token: string };
-  return data.access_token;
+  return data.access_token as string;
 };
 
 // ── Create PayPal order ───────────────────────────────────────────────────────
 export const createPayPalOrder = async (amount: number, orderId: string) => {
   const accessToken = await getAccessToken();
 
-  const res = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  const { data } = await axios.post(
+    `${PAYPAL_BASE}/v2/checkout/orders`,
+    {
       intent: 'CAPTURE',
       purchase_units: [
         {
@@ -41,10 +41,20 @@ export const createPayPalOrder = async (amount: number, orderId: string) => {
           amount: { currency_code: 'USD', value: amount.toFixed(2) },
         },
       ],
-    }),
-  });
+      // ── Uncomment when frontend is ready ─────────────────────────────────
+      // application_context: {
+      //   return_url: `${FRONTEND_URL}/payment/success?orderId=${orderId}`,
+      //   cancel_url: `${FRONTEND_URL}/payment/cancel`,
+      // },
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    },
+  );
 
-  const data = (await res.json()) as any;
   return {
     paypalOrderId: data.id as string,
     approveUrl: data.links?.find((l: any) => l.rel === 'approve')
@@ -56,10 +66,10 @@ export const createPayPalOrder = async (amount: number, orderId: string) => {
 export const capturePayPalPayment = async (paypalOrderId: string) => {
   const accessToken = await getAccessToken();
 
-  const res = await fetch(
+  const { data } = await axios.post(
     `${PAYPAL_BASE}/v2/checkout/orders/${paypalOrderId}/capture`,
+    {},
     {
-      method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -67,7 +77,6 @@ export const capturePayPalPayment = async (paypalOrderId: string) => {
     },
   );
 
-  const data = (await res.json()) as any;
   const captureId = data.purchase_units?.[0]?.payments?.captures?.[0]
     ?.id as string;
   return { status: data.status as string, captureId };
@@ -80,19 +89,18 @@ export const refundPayPalPayment = async (
 ) => {
   const accessToken = await getAccessToken();
 
-  const res = await fetch(
+  const { data } = await axios.post(
     `${PAYPAL_BASE}/v2/payments/captures/${captureId}/refund`,
     {
-      method: 'POST',
+      amount: { currency_code: 'USD', value: amount.toFixed(2) },
+    },
+    {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        amount: { currency_code: 'USD', value: amount.toFixed(2) },
-      }),
     },
   );
 
-  return res.json() as Promise<any>;
+  return data;
 };

@@ -14,7 +14,8 @@ export const authMiddleware = (
   res: Response,
   next: NextFunction,
 ): void => {
-  const token = req.cookies?.token;
+  const token =
+    req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
   if (!token) {
     res.status(401).json({ error: 'No token provided' });
     return;

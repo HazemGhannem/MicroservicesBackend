@@ -10,6 +10,8 @@ import {
   sendOrderStatusUpdated,
   sendPaymentRequested,
 } from '../kafka/order.producer';
+import { PAYMENT_API } from '../db/env';
+import axios from 'axios';
 
 // ── Request Payment ──────────────────────────────────────────────────────────────
 const requestPayment = async (data: {
@@ -20,27 +22,34 @@ const requestPayment = async (data: {
   paymentMethod: string;
   token: string;
 }) => {
-  const res = await fetch('http://payment-service:5004/api/payments/initiate', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${data.token}`,
-    },
-    body: JSON.stringify({
+  const { data: result } = await axios.post(
+    PAYMENT_API,
+    {
       orderId: data.orderId,
       paymentMethod: data.paymentMethod,
       amount: data.amount,
-    }),
-  });
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${data.token}`,
+        'Content-Type': 'application/json',
+      },
+    },
+  );
 
-  if (!res.ok) throw new AppError('Payment service failed', 502);
-  return res.json();
+  return {
+    ...(result.approveUrl && { approveUrl: result.approveUrl }),
+    ...(result.paypalOrderId && { paypalOrderId: result.paypalOrderId }),
+    ...(result.clientSecret && { clientSecret: result.clientSecret }),
+    ...(result.paymentIntentId && { paymentIntentId: result.paymentIntentId }),
+  };
 };
 // ── Create order ──────────────────────────────────────────────────────────────
 export const createOrder = async (
   data: CreateOrderInput,
   userId: string,
   userEmail: string,
+  token: string,
 ) => {
   const subtotal = data.items.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -65,15 +74,23 @@ export const createOrder = async (
   });
 
   const orderId = order._id.toString();
-
+  sendPaymentRequested({
+    orderId,
+    userId,
+    userEmail,
+    amount: total,
+    paymentMethod: data.paymentMethod,
+  });
+  let paymentData: Record<string, any> = {};
   // ── Notify payment service via Kafka (only for online payments) ──────────
   if (data.paymentMethod !== 'cash_on_delivery') {
-    sendPaymentRequested({
+    paymentData = await requestPayment({
       orderId,
       userId,
       userEmail,
       amount: total,
       paymentMethod: data.paymentMethod,
+      token,
     });
   }
 
@@ -86,7 +103,7 @@ export const createOrder = async (
     items: data.items.map((i) => ({ name: i.name, quantity: i.quantity })),
   });
 
-  return order;
+  return { order, ...paymentData };
 };
 
 // ── Get all orders (user's own) ───────────────────────────────────────────────

@@ -5,11 +5,12 @@ import {
   InitiatePaymentInput,
   PaymentQueryInput,
 } from '../validation/payment.validation';
-import { capturePayPalPayment } from './paypal.service';
+import { capturePayPalPayment, createPayPalOrder } from './paypal.service';
 import {
   sendPaymentSuccess,
   sendPaymentFailed,
 } from '../kafka/payment.producer';
+import { createStripePaymentIntent } from './stripe.service';
 
 // ── Initiate payment (HTTP fallback — normally triggered via Kafka) ────────────
 export const initiatePayment = async (
@@ -28,11 +29,38 @@ export const initiatePayment = async (
     userId,
     userEmail,
     provider: data.paymentMethod,
-    amount: data.amount, // amount is set via Kafka flow
+    amount: data.amount, // ✅ was hardcoded 0
     status: 'pending',
   });
 
-  return payment;
+  let paymentData: Record<string, any> = {};
+
+  if (data.paymentMethod === 'stripe') {
+    const { clientSecret, paymentIntentId } = await createStripePaymentIntent(
+      data.amount,
+      data.orderId,
+      userEmail,
+    );
+    await Payment.findByIdAndUpdate(payment._id, {
+      stripePaymentIntentId: paymentIntentId,
+      stripeClientSecret: clientSecret,
+    });
+    paymentData = { clientSecret, paymentIntentId };
+  }
+
+  if (data.paymentMethod === 'paypal') {
+    const { paypalOrderId, approveUrl } = await createPayPalOrder(
+      data.amount,
+      data.orderId,
+    );
+    await Payment.findByIdAndUpdate(payment._id, {
+      paypalOrderId,
+      paypalApproveUrl: approveUrl,
+    });
+    paymentData = { paypalOrderId, approveUrl };
+  }
+
+  return { payment, ...paymentData }; // ✅ returns approveUrl
 };
 
 // ── Get payment by order ──────────────────────────────────────────────────────

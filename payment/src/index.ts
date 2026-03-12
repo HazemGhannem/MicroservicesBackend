@@ -14,13 +14,19 @@ import {
 import connectDB from './db/db';
 import { PORT } from './db/env';
 import { logger } from './utils/logger';
+import * as paymentController from './controller/payment.controller';
 
 const app = express();
 
 // ── Security ──────────────────────────────────────────────────────────────────
 app.use(helmet());
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
-
+// ── Stripe webhook — raw body ONLY for this specific route ────────────────────
+app.post(
+  '/api/payments/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  paymentController.stripeWebhook,  // ✅ raw body here
+);
 // ── Body parsers ──────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(cookieParser());

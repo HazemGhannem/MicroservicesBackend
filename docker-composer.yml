@@ -127,6 +127,14 @@ services:
       order-service:
         condition: service_started
     restart: unless-stopped
+  # stripe-cli:
+  #   image: stripe/stripe-cli
+  #   command: listen --api-key ${STRIPE_SECRET_KEY} --forward-to payment-service:5004/api/payments/stripe/webhook --print-secret
+  #   env_file:
+  #     - ./payment/.env
+  #   depends_on:
+  #     - payment-service
+  #   restart: unless-stopped
 
 volumes:
   mongo-data:

@@ -1,4 +1,15 @@
+import { logger } from '../utils/logger';
 import { producer } from './config';
+
+
+const safeSend = (fn: () => Promise<unknown>): void => {
+  Promise.race([
+    fn(),
+    new Promise<unknown>((_, reject) =>
+      setTimeout(() => reject(new Error('Kafka timeout')), 3000),
+    ),
+  ]).catch((err) => logger.error({ err }, 'Kafka send failed'));
+};
 
 // ── Order placed ──────────────────────────────────────────────────────────────
 export const sendOrderPlaced = (data: {
@@ -8,23 +19,26 @@ export const sendOrderPlaced = (data: {
   total: number;
   items: { name: string; quantity: number }[];
 }): void => {
-  producer.send({
-    topic: 'order-placed',
-    messages: [{ value: JSON.stringify(data) }],
-  });
-  // Confirmation email
-  producer.send({
-    topic: 'email-topic',
-    messages: [
-      {
-        value: JSON.stringify({
-          to: data.userEmail,
-          subject: '✅ Order Confirmed!',
-          body: `Your order #${data.orderId} has been placed. Total: $${data.total}`,
-        }),
-      },
-    ],
-  });
+  safeSend(() =>
+    producer.send({
+      topic: 'order-placed',
+      messages: [{ value: JSON.stringify(data) }],
+    }),
+  );
+  safeSend(() =>
+    producer.send({
+      topic: 'email-topic',
+      messages: [
+        {
+          value: JSON.stringify({
+            to: data.userEmail,
+            subject: '✅ Order Placed!',
+            body: `Your order #${data.orderId} has been placed. Total: $${data.total}`,
+          }),
+        },
+      ],
+    }),
+  );
 };
 
 // ── Order status updated ──────────────────────────────────────────────────────
@@ -34,23 +48,26 @@ export const sendOrderStatusUpdated = (data: {
   userEmail: string;
   status: string;
 }): void => {
-  producer.send({
-    topic: 'order-status-updated',
-    messages: [{ value: JSON.stringify(data) }],
-  });
-
-  producer.send({
-    topic: 'email-topic',
-    messages: [
-      {
-        value: JSON.stringify({
-          to: data.userEmail,
-          subject: `📦 Order Update: ${data.status}`,
-          body: `Your order #${data.orderId} is now: ${data.status}`,
-        }),
-      },
-    ],
-  });
+  safeSend(() =>
+    producer.send({
+      topic: 'order-status-updated',
+      messages: [{ value: JSON.stringify(data) }],
+    }),
+  );
+  safeSend(() =>
+    producer.send({
+      topic: 'email-topic',
+      messages: [
+        {
+          value: JSON.stringify({
+            to: data.userEmail,
+            subject: `📦 Order Update: ${data.status}`,
+            body: `Your order #${data.orderId} is now: ${data.status}`,
+          }),
+        },
+      ],
+    }),
+  );
 };
 
 // ── Request payment (tells payment service to initiate) ───────────────────────
@@ -61,8 +78,10 @@ export const sendPaymentRequested = (data: {
   amount: number;
   paymentMethod: string;
 }): void => {
-  producer.send({
-    topic: 'payment-requested',
-    messages: [{ value: JSON.stringify(data) }],
-  });
+  safeSend(() =>
+    producer.send({
+      topic: 'payment-requested',
+      messages: [{ value: JSON.stringify(data) }],
+    }),
+  );
 };

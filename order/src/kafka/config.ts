@@ -4,6 +4,10 @@ import { KAFKA_BROKER } from '../db/env';
 const kafka = new Kafka({
   clientId: 'order-service',
   brokers: [KAFKA_BROKER],
+  retry: {
+    initialRetryTime: 300,
+    retries: 10,
+  },
 });
 
 export const producer = kafka.producer({
@@ -17,5 +21,3 @@ export const consumer = kafka.consumer({
   rebalanceTimeout: 60000,
   maxWaitTimeInMs: 5000,
 });
-
- 

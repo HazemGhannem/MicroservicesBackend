@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import express from 'express';
 import * as paymentController from '../controller/payment.controller';
-import { authMiddleware } from '../middleware/auth.middlware';
+import { authMiddleware } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validate.middleware';
 import {
   initiatePaymentSchema,
@@ -11,12 +10,12 @@ import {
 
 const router = Router();
 
-// ── Stripe webhook — raw body MUST be before express.json() ──────────────────
-router.post(
-  '/stripe/webhook',
-  express.raw({ type: 'application/json' }),
-  paymentController.stripeWebhook,
-);
+// // ── Stripe webhook — raw body MUST be before express.json() ──────────────────
+// router.post(
+//   '/stripe/webhook',
+//   express.raw({ type: 'application/json' }),
+//   paymentController.stripeWebhook,
+// );
 
 // ── PayPal capture ────────────────────────────────────────────────────────────
 router.post(

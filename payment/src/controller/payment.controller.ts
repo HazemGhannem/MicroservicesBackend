@@ -1,5 +1,5 @@
 import { Response, NextFunction } from 'express';
-import { AuthRequest } from '../middleware/auth.middlware';
+import { AuthRequest } from '../middleware/auth.middleware';
 import * as paymentService from '../service/payment.service';
 import { constructStripeEvent } from '../service/stripe.service';
 import {

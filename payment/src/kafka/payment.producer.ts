@@ -31,7 +31,7 @@ export const sendPaymentSuccess = (data: {
           value: JSON.stringify({
             to: data.userEmail,
             subject: '✅ Payment Successful',
-            body: `Payment of $${data.amount} for order #${data.orderId} was successful.`,
+            body: `Payment of $${data.amount} for order #${data.orderId} was successful. payment methode: ${data.paymentMethod}`,
           }),
         },
       ],

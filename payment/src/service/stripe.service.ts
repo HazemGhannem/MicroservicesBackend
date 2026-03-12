@@ -13,7 +13,7 @@ export const createStripePaymentIntent = async (
     amount: Math.round(amount * 100), // cents
     currency: 'usd',
     metadata: { orderId, userEmail },
-    automatic_payment_methods: { enabled: true },
+    automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
   });
 
   return {

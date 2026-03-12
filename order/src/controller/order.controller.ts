@@ -14,10 +14,13 @@ export const createOrder = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
+    const token =
+      req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
     const order = await orderService.createOrder(
       req.body as CreateOrderInput,
       req.userId!,
       req.userEmail!,
+      token,
     );
     res.status(201).json(order);
   } catch (err) {
