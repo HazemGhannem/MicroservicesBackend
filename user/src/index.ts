@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { PORT } from './db/env';
 import connectDB from './db/db';
 import { producer, consumer } from './kafka/config';
-import userRoutes from './routers/user.router';
+import userRoutes from './router/user.router';
 import { errorHandler } from './middleware/error.middleware';
 import { logger } from './utils/logger';
 

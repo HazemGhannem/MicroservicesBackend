@@ -38,6 +38,12 @@ export const loginController = async (req: Request, res: Response) => {
     }
 
     const result = await loginUser({ email, password });
+    res.cookie('token', result.token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
     return res.status(200).json(result);
   } catch (err: any) {
     const message =

@@ -1,9 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../model/user.model';
-import { producer } from '../kafka/config';
 import { IUserLogin, IUserRegister } from '../interface/user.interface';
 import { JWT_SECRET } from '../db/env';
+import { sendUserCreated } from '../kafka/product.producer';
 
 export const registerUser = async ({
   email,
@@ -19,22 +19,14 @@ export const registerUser = async ({
   const user = await User.create({ name, email, password: hashed });
 
   // ── Publish to Kafka → email service sends welcome email ─────────────
-  await producer.send({
-    topic: 'user-created',
-    messages: [
-      {
-        value: JSON.stringify({
-          to: email,
-          subject: 'Welcome!',
-          body: `Hi ${name}, welcome to our platform!`,
-        }),
-      },
-    ],
-  });
-  const token = jwt.sign({ id: user._id }, JWT_SECRET || 'secret', {
-    expiresIn: '7d',
-  });
-
+  const token = jwt.sign(
+    { id: user._id, email: user.email },
+    JWT_SECRET || 'secret',
+    {
+      expiresIn: '7d',
+    },
+  );
+  await sendUserCreated({ email: user.email, name: user.name });
   return { token };
 };
 export const loginUser = async ({ email, password }: IUserLogin) => {
@@ -44,10 +36,14 @@ export const loginUser = async ({ email, password }: IUserLogin) => {
   const match = await bcrypt.compare(password, user.password);
   if (!match) throw new Error('Invalid credentials');
 
-  const token = jwt.sign({ id: user._id }, JWT_SECRET || 'secret', {
-    expiresIn: '7d',
-  });
-
+  const token = jwt.sign(
+    { id: user._id, email: user.email },
+    JWT_SECRET || 'secret',
+    {
+      expiresIn: '7d',
+    },
+  );
+  
   return {
     token,
     user: {

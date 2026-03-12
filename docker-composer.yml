@@ -67,5 +67,28 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # ── product Service ──────────────────────────────────────────────────────────
+  product-service:
+    build:
+      context: ./product
+      dockerfile: Dockerfile
+    ports:
+      - '5002:5002'
+    env_file:
+      - ./product/.env
+    volumes:
+      - ./product/src:/app/src
+      - ./product/uploads:/app/uploads
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      user-service:
+        condition: service_started
+      email-service:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   mongo-data:

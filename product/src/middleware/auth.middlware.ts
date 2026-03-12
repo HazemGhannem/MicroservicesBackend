@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 
 export interface AuthRequest extends Request {
   userId?: string;
+  userEmail?: string;
   cookies: Record<string, string>;
 }
 
@@ -19,8 +20,12 @@ export const authMiddleware = (
     return;
   }
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      id: string;
+      email: string;
+    };
     req.userId = decoded.id;
+    req.userEmail = decoded.email;
     next();
   } catch (err) {
     logger.warn({ err }, 'Invalid token');
