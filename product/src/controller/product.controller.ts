@@ -43,8 +43,7 @@ export const createProduct = async (
 ): Promise<void> => {
   try {
     const files = (req.files as Express.Multer.File[]) || [];
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const images = getImageUrls(files, baseUrl);
+    const images = getImageUrls(files);
 
     const product = await productService.createProduct(
       req.body,
@@ -66,8 +65,7 @@ export const updateProduct = async (
 ): Promise<void> => {
   try {
     const files = (req.files as Express.Multer.File[]) || [];
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const newImages = files.length ? getImageUrls(files, baseUrl) : undefined;
+    const newImages = files.length ? getImageUrls(files) : undefined;
 
     const product = await productService.updateProduct(
       req.params.id as string,

@@ -10,6 +10,7 @@ import {
   sendProductDeleted,
   sendProductOutOfStock,
 } from '../kafka/product.producer';
+import cloudinary from '../utils/cloudinary';
 
 // ── Get all products with search, filter, pagination ─────────────────────────
 export const getAllProducts = async (query: ProductQueryInput) => {
@@ -153,15 +154,23 @@ export const deleteProductImage = async (
 ) => {
   const product = await Product.findById(id);
   if (!product) throw new AppError('Product not found', 404);
+  if (product.createdBy !== userId) throw new AppError('Not authorized', 403);
 
-  if (product.createdBy !== userId) {
-    throw new AppError('Not authorized', 403);
-  }
+  // ── Extract public_id from Cloudinary URL and delete ─────────────────────
+  // URL format: https://res.cloudinary.com/cloud_name/image/upload/v123/products/filename.jpg
+  const publicId = imageUrl
+    .split('/')
+    .slice(-2) // ['products', 'filename.jpg']
+    .join('/') // 'products/filename.jpg'
+    .split('.')[0]; // 'products/filename' (remove extension)
+
+  await cloudinary.uploader.destroy(publicId);
 
   const updated = await Product.findByIdAndUpdate(
     id,
     { $pull: { images: imageUrl } },
     { new: true },
   );
+
   return updated;
 };

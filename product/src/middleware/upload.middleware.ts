@@ -1,24 +1,17 @@
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import { Request } from 'express';
 import { AppError } from './error.middleware';
+import cloudinary from '../utils/cloudinary';
 
-// ── Create uploads folder if it doesn't exist ─────────────────────────────────
-const uploadDir = path.join(process.cwd(), 'uploads/products');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// ── Storage config ────────────────────────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  },
+// ── Cloudinary storage ────────────────────────────────────────────────────────
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'products', // ✅ folder in your Cloudinary account
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 800, height: 800, crop: 'limit' }], // ✅ auto resize
+  } as any,
 });
 
 // ── File filter — images only ─────────────────────────────────────────────────
@@ -39,15 +32,12 @@ export const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB max per file
-    files: 5, // max 5 images per product
+    fileSize: 5 * 1024 * 1024, // 5MB
+    files: 5, // max 5 images
   },
 });
 
-// ── Helper: get public URLs for uploaded files ────────────────────────────────
-export const getImageUrls = (
-  files: Express.Multer.File[],
-  baseUrl: string,
-): string[] => {
-  return files.map((file) => `${baseUrl}/uploads/products/${file.filename}`);
+// ── Helper: get Cloudinary URLs ───────────────────────────────────────────────
+export const getImageUrls = (files: Express.Multer.File[]): string[] => {
+  return files.map((file: any) => file.path); // ✅ Cloudinary returns full URL in file.path
 };
