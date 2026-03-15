@@ -90,5 +90,55 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # ── order Service ──────────────────────────────────────────────────────────
+  order-service:
+    build:
+      context: ./order
+      dockerfile: Dockerfile
+    ports:
+      - '5003:5003'
+    env_file:
+      - ./order/.env
+    volumes:
+      - ./order/src:/app/src
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      product-service:
+        condition: service_started
+    restart: unless-stopped
+
+  # ── payment Service ──────────────────────────────────────────────────────────
+  payment-service:
+    build:
+      context: ./payment
+      dockerfile: Dockerfile
+    ports:
+      - '5004:5004'
+    env_file:
+      - ./payment/.env
+    volumes:
+      - ./payment/src:/app/src
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      order-service:
+        condition: service_started
+    restart: unless-stopped
+
+  # ── strpie cli for webhook ──────────────────────────────────────────────────────────
+  # stripe-cli:
+  #   image: stripe/stripe-cli
+  #   command: listen --api-key ${STRIPE_SECRET_KEY} --forward-to payment-service:5004/api/payments/stripe/webhook --print-secret
+  #   env_file:
+  #     - ./payment/.env
+  #   depends_on:
+  #     - payment-service
+  #   restart: unless-stopped
+
 volumes:
   mongo-data:

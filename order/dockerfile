@@ -12,5 +12,4 @@ COPY . .
 
  RUN npm prune --production
 
-
 CMD ["npx", "ts-node-dev", "--respawn", "--transpile-only", "--exit-child", "src/index.ts"]
