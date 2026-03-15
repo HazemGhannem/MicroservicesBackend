@@ -130,6 +130,24 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # ── api getway ──────────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    ports:
+      - '5000:5000'
+    env_file:
+      - ./gateway/.env
+    volumes:
+      - ./gateway/src:/app/src
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - payment-service
+    restart: unless-stopped
+
   # ── strpie cli for webhook ──────────────────────────────────────────────────────────
   # stripe-cli:
   #   image: stripe/stripe-cli

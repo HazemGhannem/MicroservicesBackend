@@ -1,0 +1,26 @@
+{
+  "name": "gateway",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "ts-node-dev --respawn --transpile-only --exit-child src/index.ts"
+  },
+  "dependencies": {
+    "@types/cors": "^2.8.19",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
+    "http-proxy-middleware": "^3.0.5",
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.6",
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.0"
+  }
+}
