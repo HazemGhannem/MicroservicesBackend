@@ -1,6 +1,6 @@
 # 🛒 E-Commerce Microservices Backend
 
-A production-ready e-commerce backend built with **Node.js**, **TypeScript**, **Kafka**, **MongoDB**, and **Docker**. The system is split into independent microservices that communicate via Kafka events and REST APIs.
+A production-ready e-commerce backend built with **Node.js**, **TypeScript**, **Kafka**, **MongoDB**, and **Docker**. The system is split into independent microservices that communicate via Kafka events and REST APIs, all accessible through a single **API Gateway**.
 
 ---
 
@@ -10,12 +10,13 @@ A production-ready e-commerce backend built with **Node.js**, **TypeScript**, **
                         ┌─────────────────────────────────────────┐
                         │            Docker Network               │
                         │                                         │
-  Client (Postman /  ──►│  user-service     :5001                 │
-  Next.js Frontend)     │  product-service  :5002                 │
-                        │  order-service    :5003                 │
-                        │  payment-service  :5004                 │
-                        │  email-service    (internal)            │
+  Client (Postman /  ──►│  api-gateway      :5000  (entry point)  │
+  Next.js Frontend)     │    ├── user-service     :5001           │
+                        │    ├── product-service  :5002           │
+                        │    ├── order-service    :5003           │
+                        │    └── payment-service  :5004           │
                         │                                         │
+                        │  email-service    (internal only)       │
                         │  kafka + zookeeper (event bus)          │
                         │  mongodb           (databases)          │
                         └─────────────────────────────────────────┘
@@ -23,12 +24,22 @@ A production-ready e-commerce backend built with **Node.js**, **TypeScript**, **
 
 ### Service Communication
 
+- **API Gateway** — single entry point for all frontend/client requests, proxies to the correct microservice
 - **HTTP (sync)** — order-service calls payment-service directly to get `approveUrl` / `clientSecret` back immediately
 - **Kafka (async)** — all notifications, status updates, emails, and refunds go through Kafka topics
 
 ---
 
 ## 🧩 Services
+
+### 🌐 API Gateway (port 5000)
+
+Single entry point for all client requests.
+
+- Routes requests to the correct microservice
+- Forwards JWT cookies as Authorization headers
+- Rate limiting and CORS
+- Request logging with Pino
 
 ### 👤 User Service (port 5001)
 
@@ -79,20 +90,19 @@ Listens to `email-topic` Kafka messages and sends emails via **Gmail SMTP / Node
 
 ## 🔄 Kafka Topics
 
-| Topic                  | Producer                             | Consumer        |
-| ---------------------- | ------------------------------------ | --------------- |
-| `payment-requested`    | ~~order-service~~ (replaced by HTTP) | -               |
-| `payment-success`      | payment-service                      | order-service   |
-| `payment-failed`       | payment-service                      | order-service   |
-| `refund-requested`     | order-service                        | payment-service |
-| `refund-processed`     | payment-service                      | -               |
-| `order-placed`         | order-service                        | -               |
-| `order-status-updated` | order-service                        | -               |
-| `product-created`      | product-service                      | -               |
-| `product-deleted`      | product-service                      | -               |
-| `product-out-of-stock` | product-service                      | -               |
-| `email-topic`          | all services                         | email-service   |
-| `user-created`         | user-service                         | email-service   |
+| Topic                  | Producer        | Consumer        |
+| ---------------------- | --------------- | --------------- |
+| `payment-success`      | payment-service | order-service   |
+| `payment-failed`       | payment-service | order-service   |
+| `refund-requested`     | order-service   | payment-service |
+| `refund-processed`     | payment-service | -               |
+| `order-placed`         | order-service   | -               |
+| `order-status-updated` | order-service   | -               |
+| `product-created`      | product-service | -               |
+| `product-deleted`      | product-service | -               |
+| `product-out-of-stock` | product-service | -               |
+| `email-topic`          | all services    | email-service   |
+| `user-created`         | user-service    | email-service   |
 
 ---
 
@@ -102,6 +112,7 @@ Listens to `email-topic` Kafka messages and sends emails via **Gmail SMTP / Node
 
 ```
 POST /api/orders (paymentMethod: "stripe")
+  → gateway → order-service
   → order-service calls payment-service /initiate via HTTP
   → payment-service creates Stripe PaymentIntent
   → returns { clientSecret, paymentIntentId }
@@ -115,6 +126,7 @@ POST /api/orders (paymentMethod: "stripe")
 
 ```
 POST /api/orders (paymentMethod: "paypal")
+  → gateway → order-service
   → order-service calls payment-service /initiate via HTTP
   → payment-service creates PayPal order
   → returns { approveUrl, paypalOrderId }
@@ -151,6 +163,17 @@ DELETE /api/orders/:id
 ```
 MicroService/
 ├── docker-compose.yml
+├── gateway/                  ← API Gateway
+│   ├── src/
+│   │   ├── index.ts          (middleware setup)
+│   │   ├── proxy.ts          (proxy)
+│   │   ├── config/env.ts
+│   │   ├── middleware/
+│   │   │   ├── logger.middleware.ts
+│   │   │   └── error.middleware.ts
+│   │   └── utils/logger.ts
+│   ├── Dockerfile
+│   └── .env.example
 ├── user/
 │   ├── src/
 │   │   ├── controller/
@@ -189,21 +212,36 @@ MicroService/
 ### 1. Clone and setup environment files
 
 ```bash
-git clone <your-repo>
+git clone  https://github.com/HazemGhannem/MicroservicesBackend.git
 cd MicroService
 ```
 
 Copy and fill in each service's env file:
 
 ```bash
-cp user/.env.example user/.env
-cp product/.env.example product/.env
-cp order/.env.example order/.env
-cp payment/.env.example payment/.env
-cp email/.env.example email/.env
+cp gateway/.env.example  gateway/.env
+cp user/.env.example     user/.env
+cp product/.env.example  product/.env
+cp order/.env.example    order/.env
+cp payment/.env.example  payment/.env
+cp email/.env.example    email/.env
 ```
 
 ### 2. Environment variables
+
+**gateway/.env**
+
+```env
+PORT=5000
+NODE_ENV=development
+USER_SERVICE_URL=http://user-service:5001
+PRODUCT_SERVICE_URL=http://product-service:5002
+ORDER_SERVICE_URL=http://order-service:5003
+PAYMENT_SERVICE_URL=http://payment-service:5004
+FRONTEND_URL=http://localhost:3001
+RATE_LIMIT_MAX=200
+RATE_LIMIT_WINDOW_MS=900000
+```
 
 **user/.env**
 
@@ -272,6 +310,10 @@ docker compose logs -f
 
 # Stop everything
 docker compose down
+
+# Rebuild single service
+docker compose build --no-cache api-gateway
+docker compose up -d api-gateway
 ```
 
 ### 4. Stripe webhook (local development)
@@ -288,15 +330,19 @@ Copy the printed `whsec_xxx` → paste into `payment/.env` as `STRIPE_WEBHOOK_SE
 
 ## 📡 API Endpoints
 
-### Auth (user-service :5001)
+> All requests go through the API Gateway on port **5000**.
+> Direct service ports (5001-5004) are still available for internal use.
 
-| Method | Endpoint             | Description              |
-| ------ | -------------------- | ------------------------ |
-| POST   | `/api/auth/register` | Register new user        |
-| POST   | `/api/auth/login`    | Login and get JWT cookie |
-| POST   | `/api/auth/logout`   | Logout                   |
+### Users (→ user-service :5001)
 
-### Products (product-service :5002)
+| Method | Endpoint              | Description              |
+| ------ | --------------------- | ------------------------ |
+| POST   | `/api/users/register` | Register new user        |
+| POST   | `/api/users/login`    | Login and get JWT cookie |
+| POST   | `/api/users/logout`   | Logout                   |
+| GET    | `/api/users/me`       | Get current user         |
+
+### Products (→ product-service :5002)
 
 | Method | Endpoint            | Description           |
 | ------ | ------------------- | --------------------- |
@@ -306,7 +352,7 @@ Copy the printed `whsec_xxx` → paste into `payment/.env` as `STRIPE_WEBHOOK_SE
 | PUT    | `/api/products/:id` | Update product (auth) |
 | DELETE | `/api/products/:id` | Delete product (auth) |
 
-### Orders (order-service :5003)
+### Orders (→ order-service :5003)
 
 | Method | Endpoint                 | Description           |
 | ------ | ------------------------ | --------------------- |
@@ -316,7 +362,7 @@ Copy the printed `whsec_xxx` → paste into `payment/.env` as `STRIPE_WEBHOOK_SE
 | PUT    | `/api/orders/:id/status` | Update status (admin) |
 | DELETE | `/api/orders/:id`        | Cancel order + refund |
 
-### Payments (payment-service :5004)
+### Payments (→ payment-service :5004)
 
 | Method | Endpoint                       | Description               |
 | ------ | ------------------------------ | ------------------------- |
@@ -325,6 +371,12 @@ Copy the printed `whsec_xxx` → paste into `payment/.env` as `STRIPE_WEBHOOK_SE
 | GET    | `/api/payments`                | Get my payments           |
 | GET    | `/api/payments/order/:orderId` | Get payment by order      |
 | POST   | `/api/payments/stripe/webhook` | Stripe webhook (internal) |
+
+### Gateway
+
+| Method | Endpoint  | Description                         |
+| ------ | --------- | ----------------------------------- |
+| GET    | `/health` | Gateway health check + service URLs |
 
 ---
 
@@ -355,6 +407,7 @@ CVC:         123
 | Runtime          | Node.js 20               |
 | Language         | TypeScript               |
 | Framework        | Express.js               |
+| API Gateway      | http-proxy-middleware    |
 | Database         | MongoDB + Mongoose       |
 | Message Broker   | Apache Kafka (KafkaJS)   |
 | Validation       | Zod                      |
@@ -371,5 +424,6 @@ CVC:         123
 
 ## 👨‍💻 Author
 
-**Hazem Ghannem**  
-
+**Hazem Ghannem**
+MS Software Engineering Student
+Grand Valley State University
